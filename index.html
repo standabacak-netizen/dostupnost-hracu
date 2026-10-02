@@ -280,14 +280,15 @@
     }
   }
 
-  // Funkce pro ukládání dat do Supabase
+ // Funkce pro ukládání dat do Supabase (upraveno pro vaši tabulku)
   async function saveData() {
     if (!state.room) return;
     status("Ukládám…", "ok");
     
+    // Posíláme 'room_code' místo 'id' a data balíme do sloupce 'state'
     const { error } = await sb.from("rooms").upsert({ 
-      id: state.room, 
-      tokens: state.tokens,
+      room_code: state.room, 
+      state: { tokens: state.tokens },
       updated_at: new Date()
     });
     
@@ -299,18 +300,20 @@
     }
   }
 
-  // Funkce pro načtení dat ze Supabase při startu
+  // Funkce pro načtení dat ze Supabase při startu (upraveno pro vaši tabulku)
   async function loadData() {
     if (!state.room) return;
     status("Načítám data…");
     
-    const { data, error } = await sb.from("rooms").select("tokens").eq("id", state.room).maybeSingle();
+    // Hledáme podle 'room_code' a vytahujeme sloupec 'state'
+    const { data, error } = await sb.from("rooms").select("state").eq("room_code", state.room).maybeSingle();
     
     if (error) {
       status("Chyba načítání", "err");
       console.error(error);
     } else {
-      state.tokens = data && data.tokens ? data.tokens : [];
+      // Data rozbalíme ze sloupce 'state'
+      state.tokens = data && data.state && data.state.tokens ? data.state.tokens : [];
       renderTokens();
       status("Připojeno", "ok");
     }
