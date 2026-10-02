@@ -97,7 +97,9 @@
   const SUPABASE_URL = "https://eogswjjxeqxomimevqmq.supabase.co";
   const SUPABASE_KEY = "sb_publishable_cRwExBvhx9itYp-9158eHA_Lh_SIxMf";
 
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  db: { schema: 'public' }
+});
   const state = {
     room: null,
     players: [
@@ -307,7 +309,7 @@
     
     // Hledáme podle 'room_code' a vytahujeme sloupec 'state'
     const { data, error } = await sb.from("rooms").select("state").eq("room_code", state.room).maybeSingle();
-    
+
     if (error) {
       status("Chyba načítání", "err");
       console.error(error);
