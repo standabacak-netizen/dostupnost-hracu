@@ -92,8 +92,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (() => {
-  const SUPABASE_URL = "VLOZ_SUPABASE_URL";
-  const SUPABASE_KEY = "VLOZ_SUPABASE_PUBLISHABLE_KEY";
+  // Klíče jsou v ostré verzi nasazené, zde ponecháno pro inicializaci
+  const SUPABASE_URL = "https://eogswjjxeqxomimevqmq.supabase.co/rest/v1/";
+  const SUPABASE_KEY = "sb_publishable_cRwExBvhx9itYp-9158eHA_Lh_SIxMf";
 
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const state = {
@@ -112,11 +113,11 @@
     applyingRemote: false
   };
 
-  const $ = id => document.getElementById(id);
-  const status = (msg, cls="") => { $("status").textContent=msg; $("status").className="status "+cls; };
+  const \$ = id => document.getElementById(id);
+  const status = (msg, cls="") => { ("status").textContent=msg; ("status").className="status "+cls; };
 
   function roomFromUrl(){
-    const m = location.hash.match(/^#room=([A-Za-z0-9_-]+)$/);
+    const m = location.hash.match(/^#room=([A-Za-z0-9_-]+)\$/);
     return m ? m[1].toUpperCase() : null;
   }
   function randomRoom(){
@@ -125,7 +126,7 @@
     for(let i=0;i<6;i++) s+=chars[Math.floor(Math.random()*chars.length)];
     return s;
   }
-  function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));}
+  function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c]));}
 
   function dateAt(offset){
     const d=new Date();
@@ -139,193 +140,223 @@
     return `${wd} ${d.getDate()}.${d.getMonth()+1}.`;
   }
 
+  // Vykreslení seznamu hráčů (hromádky pro přetahování)
+  function renderPlayers() {
+    const container = \$("players");
+    container.innerHTML = "";
+    state.players.forEach(p => {
+      const pDiv = document.createElement("div");
+      pDiv.className = "player";
+      pDiv.innerHTML = `
+        <div class="player-top">
+          <input type="color" value="${p.color}" disabled>
+          <input class="name" value="${p.name}" disabled>
+        </div>
+        <div class="pool" data-player-id="${p.id}">
+          <div class="token" draggable="true" style="background:${p.color}" data-player-id="${p.id}"></div>
+          <span>Táhni mě</span>
+        </div>
+      `;
+      
+      // Aktivace táhnutí z hromádky
+      const token = pDiv.querySelector(".token");
+      token.addEventListener("dragstart", e => {
+        state.dragging = { playerId: p.id, source: "pool" };
+      });
+      container.appendChild(pDiv);
+    });
+  }
+
+  // Kompletní sestavení kalendáře a obsluha přetažení (Drag & Drop)
   function buildBoard(){
-    const head=$("board").querySelector("thead tr"), body=$("board").querySelector("tbody");
+    const head=("board").querySelector("thead tr"), body=("board").querySelector("tbody");
     head.innerHTML='<th class="day-head">Den</th>';
     body.innerHTML="";
+    
     for(let h=0;h<24;h++){
       const th=document.createElement("th"); th.textContent=String(h).padStart(2,"0")+":00"; head.appendChild(th);
     }
+    
     for(let d=0;d<14;d++){
       const tr=document.createElement("tr");
       const th=document.createElement("th"); th.className="day-cell"; th.textContent=dayLabel(d); tr.appendChild(th);
+      
       for(let h=0;h<24;h++){
         const td=document.createElement("td"); td.className="slot"; td.dataset.day=d; td.dataset.hour=h;
         td.innerHTML='<div class="tokens"></div>';
-        td.addEventListener("dragover",e=>{e.preventDefault();td.classList.add("over")});
-        td.addEventListener("dragleave",()=>td.classList.remove("over"));
-        td.addEventListener("drop",e=>{
-          e.preventDefault(); td.classList.remove("over");
-          if(!state.dragging)return;
-          moveOrCreate(state.dragging.playerId,state.dragging.tokenId,d,h);
-          state.dragging=null;
+        
+        td.addEventListener("dragover", e => {
+          e.preventDefault();
+          td.classList.add("over");
         });
+        
+        td.addEventListener("dragleave", () => {
+          td.classList.remove("over");
+        });
+        
+        td.addEventListener("drop", e => {
+          e.preventDefault();
+          td.classList.remove("over");
+          if (!state.dragging) return;
+          
+          const day = parseInt(td.dataset.day);
+          const hour = parseInt(td.dataset.hour);
+          const pId = state.dragging.playerId;
+          
+          // Kontrola, zda už hráč v této hodině není
+          const existuje = state.tokens.some(t => t.day === day && t.hour === hour && t.playerId === pId);
+          if (!existuje) {
+            state.tokens.push({ day, hour, playerId: pId });
+            renderTokens();
+            saveData();
+          }
+        });
+        
         tr.appendChild(td);
       }
       body.appendChild(tr);
     }
   }
 
-  function renderPlayers(){
-    const wrap=$("players"); wrap.innerHTML="";
-    state.players.forEach(p=>{
-      const card=document.createElement("div"); card.className="player";
-      card.innerHTML=`
-        <div class="player-top">
-          <input class="name" maxlength="30" value="${escapeHtml(p.name)}" aria-label="Jméno hráče">
-          <input type="color" value="${p.color}" aria-label="Barva hráče">
-        </div>
-        <div class="pool">
-          <span class="token pool-token" draggable="true" style="background:${p.color}" title="Přetáhni do tabulky"></span>
-          <span>nekonečná hromádka</span>
-        </div>`;
-      const name=card.querySelector(".name"), color=card.querySelector('input[type=color]'), pool=card.querySelector(".pool-token");
-      name.addEventListener("input",()=>{p.name=name.value||`Hráč ${p.id+1}`;scheduleSave()});
-      color.addEventListener("input",()=>{p.color=color.value; pool.style.background=p.color; renderTokens(); scheduleSave()});
-      pool.addEventListener("dragstart",e=>{
-        const id="new-"+p.id+"-"+crypto.randomUUID();
-        state.dragging={playerId:p.id,tokenId:id};
-        e.dataTransfer.setData("text/plain",id); e.dataTransfer.effectAllowed="copy";
-      });
-      wrap.appendChild(card);
-    });
-  }
-
-  function renderTokens(){
-    document.querySelectorAll(".tokens").forEach(x=>x.innerHTML="");
-    state.tokens.forEach(t=>{
-      const td=document.querySelector(`td[data-day="${t.day}"][data-hour="${t.hour}"]`);
-      if(!td)return;
-      const p=state.players[t.playerId];
-      const el=document.createElement("span"); el.className="token"; el.draggable=true; el.style.background=p.color; el.title=p.name;
-      el.addEventListener("dragstart",e=>{
-        state.dragging={playerId:t.playerId,tokenId:t.id};
-        e.dataTransfer.setData("text/plain",t.id); e.dataTransfer.effectAllowed="move";
-      });
-      td.querySelector(".tokens").appendChild(el);
+  // Vykreslení žetonů do mřížky na základě stavu
+  function renderTokens() {
+    // Vyčistíme všechny buňky
+    document.querySelectorAll("td.slot .tokens").forEach(el => el.innerHTML = "");
+    
+    state.tokens.forEach(t => {
+      const slot = document.querySelector(`td.slot[data-day="${t.day}"][data-hour="${t.hour}"] .tokens`);
+      if (slot) {
+        const p = state.players.find(pl => pl.id === t.playerId);
+        if (p) {
+          const tok = document.createElement("div");
+          tok.className = "token";
+          tok.style.background = p.color;
+          tok.setAttribute("draggable", "true");
+          
+          tok.addEventListener("dragstart", () => {
+            state.dragging = { playerId: t.playerId, day: t.day, hour: t.hour, source: "board" };
+          });
+          
+          slot.appendChild(tok);
+        }
+      }
     });
     updateMatches();
   }
 
-  function validPlacement(playerId,day,hour,exceptId=null){
-    return !state.tokens.some(t=>t.playerId===playerId && t.day===day && t.hour===hour && t.id!==exceptId);
-  }
-
-  function moveOrCreate(playerId,tokenId,day,hour){
-    if(!validPlacement(playerId,day,hour,tokenId)){ status("Tento hráč už v této hodině kolečko má.","err"); return; }
-    const existing=state.tokens.find(t=>t.id===tokenId);
-    if(existing){ existing.day=day; existing.hour=hour; }
-    else state.tokens.push({id:tokenId,playerId,day,hour});
-    renderTokens(); scheduleSave();
-  }
-
-  function removeToken(id){
-    const i=state.tokens.findIndex(t=>t.id===id);
-    if(i>=0){state.tokens.splice(i,1);renderTokens();scheduleSave();}
-  }
-
-  document.addEventListener("dragover",e=>{
-    if(state.dragging && !e.target.closest(".slot")) e.preventDefault();
-  });
-  document.addEventListener("drop",e=>{
-    if(state.dragging && !e.target.closest(".slot")){
-      e.preventDefault();
-      if(state.dragging.tokenId && !state.dragging.tokenId.startsWith("new-")) removeToken(state.dragging.tokenId);
-      state.dragging=null;
+  // Výpočet a zobrazení společných průniků všech hráčů
+  function updateMatches() {
+    const matchesDiv = \$("matches");
+    matchesDiv.innerHTML = "";
+    
+    const totalPlayers = state.players.length;
+    let found = false;
+    
+    for (let d = 0; d < 14; d++) {
+      for (let h = 0; h < 24; h++) {
+        const count = state.tokens.filter(t => t.day === d && t.hour === h).length;
+        if (count === totalPlayers) {
+          found = true;
+          const span = document.createElement("span");
+          span.className = "match";
+          span.textContent = `${dayLabel(d)} ve ${String(h).padStart(2,"0")}:00`;
+          matchesDiv.appendChild(span);
+        }
+      }
     }
-  });
-
-  function updateMatches(){
-    const counts=new Map();
-    state.tokens.forEach(t=>{
-      const k=`${t.day}|${t.hour}`;
-      if(!counts.has(k))counts.set(k,new Set());
-      counts.get(k).add(t.playerId);
-    });
-    const all=[...counts.entries()].filter(([,s])=>s.size===5).sort((a,b)=>{
-      const [ad,ah]=a[0].split("|").map(Number),[bd,bh]=b[0].split("|").map(Number);
-      return ad-bd||ah-bh;
-    });
-    const box=$("matches"); box.innerHTML="";
-    if(!all.length){box.innerHTML='<span class="status">Zatím nejsou žádné společné sloty.</span>';return;}
-    all.forEach(([k])=>{
-      const [d,h]=k.split("|").map(Number);
-      const x=document.createElement("span");x.className="match";x.textContent=`${dayLabel(d)} ${String(h).padStart(2,"0")}:00`;box.appendChild(x);
-    });
+    if (!found) {
+      matchesDiv.innerHTML = '<span class="status">Zatím nejsou žádné společné sloty.</span>';
+    }
   }
 
-  function payload(){return {players:state.players,tokens:state.tokens};}
-
-  function scheduleSave(){
-    if(state.applyingRemote || !state.room)return;
-    clearTimeout(state.saveTimer);
-    state.saveTimer=setTimeout(save,350);
-  }
-  async function save(){
-    if(!state.room)return;
-    status("Ukládám…");
-    const {error}=await sb.from("rooms").upsert({room_code:state.room,state:payload()},{onConflict:"room_code"});
-    if(error){console.error(error);status("Chyba ukládání: "+error.message,"err");}
-    else status("Synchronizováno","ok");
-  }
-
-  async function loadRoom(code){
-    state.room=code; $("roomCode").textContent=code;
-    history.replaceState(null,"",location.pathname+location.search+"#room="+encodeURIComponent(code));
-    status("Načítám místnost…");
-    const {data,error}=await sb.from("rooms").select("state").eq("room_code",code).maybeSingle();
-    if(error){status("Chyba připojení: "+error.message,"err");return;}
-    if(data?.state){
-      state.applyingRemote=true;
-      if(Array.isArray(data.state.players))state.players=data.state.players;
-      if(Array.isArray(data.state.tokens))state.tokens=data.state.tokens;
-      state.applyingRemote=false;
+  // Funkce pro ukládání dat do Supabase
+  async function saveData() {
+    if (!state.room) return;
+    status("Ukládám…", "ok");
+    
+    const { error } = await sb.from("rooms").upsert({ 
+      id: state.room, 
+      tokens: state.tokens,
+      updated_at: new Date()
+    });
+    
+    if (error) {
+      status("Chyba ukládání", "err");
+      console.error(error);
     } else {
-      const {error:e}=await sb.from("rooms").insert({room_code:code,state:payload()});
-      if(e && e.code!=="23505"){status("Chyba vytvoření místnosti: "+e.message,"err");return;}
+      status("Připojeno", "ok");
     }
-    renderPlayers();renderTokens();subscribe();status("Synchronizováno","ok");
   }
 
-  function subscribe(){
-    if(state.channel) sb.removeChannel(state.channel);
-    state.channel=sb.channel("room-db-"+state.room)
-      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"rooms",filter:`room_code=eq.${state.room}`},payload=>{
-        const s=payload.new?.state;
-        if(!s)return;
-        state.applyingRemote=true;
-        if(Array.isArray(s.players))state.players=s.players;
-        if(Array.isArray(s.tokens))state.tokens=s.tokens;
-        state.applyingRemote=false;
-        renderPlayers();renderTokens();status("Aktualizováno ostatními","ok");
-      })
-      .on("postgres_changes",{event:"INSERT",schema:"public",table:"rooms",filter:`room_code=eq.${state.room}`},payload=>{
-        const s=payload.new?.state;if(!s)return;
-        state.applyingRemote=true;state.players=s.players||state.players;state.tokens=s.tokens||[];state.applyingRemote=false;
-        renderPlayers();renderTokens();status("Aktualizováno","ok");
-      })
-      .subscribe((s)=>{if(s==="SUBSCRIBED")status("Online · realtime aktivní","ok")});
+  // Funkce pro načtení dat ze Supabase při startu
+  async function loadData() {
+    if (!state.room) return;
+    status("Načítám data…");
+    
+    const { data, error } = await sb.from("rooms").select("tokens").eq("id", state.room).maybeSingle();
+    
+    if (error) {
+      status("Chyba načítání", "err");
+      console.error(error);
+    } else {
+      state.tokens = data && data.tokens ? data.tokens : [];
+      renderTokens();
+      status("Připojeno", "ok");
+    }
   }
 
-  $("copyLink").addEventListener("click",async()=>{
-    try{await navigator.clipboard.writeText(location.href);status("Odkaz zkopírován","ok")}
-    catch{prompt("Zkopíruj tento odkaz:",location.href)}
-  });
-  $("newRoom").addEventListener("click",()=>{
-    const code=randomRoom();
-    location.hash="room="+code;
-    location.reload();
+  // Inicializace místnosti
+  function initRoom(code) {
+    state.room = code;
+    location.hash = `room=${code}`;
+    \$("roomCode").textContent = code;
+    \$("setupOverlay").classList.add("hidden");
+    
+    // Načteme data a vykreslíme rozhraní
+    renderPlayers();
+    buildBoard();
+    loadData();
+    
+    // Aktivace mazání přetažením mimo tabulku
+    document.body.addEventListener("dragover", e => e.preventDefault());
+    document.body.addEventListener("drop", e => {
+      if (state.dragging && state.dragging.source === "board") {
+        state.tokens = state.tokens.filter(t => 
+          !(t.day === state.dragging.day && t.hour === state.dragging.hour && t.playerId === state.dragging.playerId)
+        );
+        state.dragging = null;
+        renderTokens();
+        saveData();
+      }
+    });
+  }
+
+  // Event Listenery pro UI prvky
+  \$("copyLink").addEventListener("click", () => {
+    navigator.clipboard.writeText(location.href);
+    alert("Odkaz na místnost byl zkopírován!");
   });
 
-  buildBoard();
-  const room=roomFromUrl();
-  if(room) loadRoom(room);
-  else { $("setupOverlay").classList.remove("hidden"); $("roomInput").value=randomRoom(); }
-  $("createRoom").addEventListener("click",()=>{
-    const code=($("roomInput").value||randomRoom()).trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,12);
-    if(code){location.hash="room="+code;location.reload();}
+  \$("newRoom").addEventListener("click", () => {
+    initRoom(randomRoom());
   });
+
+  \$("createRoom").addEventListener("click", () => {
+    const val = \$("roomInput").value.trim().toUpperCase();
+    if (val) initRoom(val);
+  });
+
+  // Start aplikace
+  const currentRoom = roomFromUrl();
+  if (currentRoom) {
+    initRoom(currentRoom);
+  } else {
+    \$("setupOverlay").classList.remove("hidden");
+    status("Čekám na vytvoření místnosti…");
+  }
 })();
+
+
 </script>
 </body>
 </html>
