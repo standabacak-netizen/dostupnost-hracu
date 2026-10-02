@@ -9,6 +9,7 @@
       --bg:#f7f7f8;--panel:#fff;--text:#202124;--muted:#6b7280;
       --border:#dfe3e8;--accent:#2563eb;--accent-bg:#e8f0ff;
       --danger:#c62828;--ok:#18794e;--cell:76px;--row:58px;
+      --full-green: #e2f4e9; /* Jemně zelená pro plně obsazené buňky */
     }
     *{box-sizing:border-box}
     body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
@@ -25,8 +26,9 @@
     .players{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:10px;margin-bottom:14px}
     .player{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:11px}
     .player-top{display:flex;gap:7px;align-items:center}
-    .name{width:100%;min-width:0;border:1px solid var(--border);border-radius:7px;padding:7px 8px;font-size:14px}
-    input[type=color]{width:38px;height:36px;padding:2px;border:1px solid var(--border);border-radius:7px;background:white}
+    .name{width:100%;min-width:0;border:1px solid var(--border);border-radius:7px;padding:7px 8px;font-size:14px;background:#fff;color:var(--text)}
+    .name:focus{outline:2px solid var(--accent);border-color:transparent}
+    input[type=color]{width:38px;height:36px;padding:2px;border:1px solid var(--border);border-radius:7px;background:white;cursor:not-allowed}
     .pool{display:flex;align-items:center;gap:10px;margin-top:9px;color:var(--muted);font-size:12px}
     .token{width:30px;height:30px;border-radius:50%;border:2px solid rgba(0,0,0,.15);box-shadow:0 1px 2px rgba(0,0,0,.16);cursor:grab;touch-action:none;flex:0 0 auto}
     .pool .token{width:42px;height:42px}
@@ -36,8 +38,9 @@
     thead th{position:sticky;top:0;z-index:4;background:#fafafa;height:42px;font-size:12px;min-width:var(--cell)}
     .day-head{position:sticky;left:0;z-index:7;width:120px;min-width:120px;background:#fafafa}
     .day-cell{position:sticky;left:0;z-index:3;width:120px;min-width:120px;background:#fafafa;padding:8px 10px;font-size:12px;font-weight:700}
-    td.slot{width:var(--cell);min-width:var(--cell);height:var(--row);vertical-align:middle;background:#fff}
-    td.slot.over{background:var(--accent-bg)}
+    td.slot{width:var(--cell);min-width:var(--cell);height:var(--row);vertical-align:middle;background:#fff;transition:background 0.15s ease}
+    td.slot.over{background:var(--accent-bg)!important}
+    td.slot.full-slot {background:var(--full-green)} /* Třída pro plnou buňku (5 hráčů) */
     .tokens{min-height:100%;display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;padding:4px}
     .hint{font-size:12px;color:var(--muted);margin:10px 2px}
     .summary{margin-top:16px;background:white;border:1px solid var(--border);border-radius:12px;padding:14px}
@@ -76,7 +79,7 @@
 
   <div class="summary">
     <h2>Společně dostupní všichni hráči</h2>
-    <div class="summary-list" id="matches"><span class="status">Zatím nejsou žádné společné sloty.</span></div>
+    <div class="summary-list" id="matches"><span class="status">Zatím nejsou žádné společné slots.</span></div>
   </div>
 </div>
 
@@ -89,17 +92,17 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
+<script src="https://jsdelivr.net"></script>
 <script>
 (() => {
-  // Zde doplňte své ostré klíče ze Supabase
+  // ZDE DOPLŇTE SVÉ FUNKČNÍ KLÍČE
   const SUPABASE_URL = "https://eogswjjxeqxomimevqmq.supabase.co";
   const SUPABASE_KEY = "sb_publishable_cRwExBvhx9itYp-9158eHA_Lh_SIxMf";
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  db: { schema: 'public' }
-});
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    db: { schema: 'public' }
+  });
+
   const state = {
     room: null,
     players: [
@@ -116,7 +119,6 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     applyingRemote: false
   };
 
-  // Kompletně přepsáno bez znaku dolaru, aby systém nevkládal lomítka
   function getEl(id) {
     return document.getElementById(id);
   }
@@ -127,7 +129,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   }
 
   function roomFromUrl(){
-    const m = location.hash.match(/^#room=([A-Za-z0-9_-]+)\$/);
+    const m = location.hash.match(/^#room=([A-Za-z0-9_-]+)$/);
     return m ? m[1].toUpperCase() : null;
   }
   
@@ -155,7 +157,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     return wd + " " + d.getDate() + "." + (d.getMonth()+1) + ".";
   }
 
-  // Vykreslení seznamu hráčů (hromádky pro přetahování)
+  // Vykreslení seznamu hráčů (Nyní upraveno, abyste mohl přepisovat jména!)
   function renderPlayers() {
     const container = getEl("players");
     container.innerHTML = "";
@@ -165,14 +167,22 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
       pDiv.innerHTML = `
         <div class="player-top">
           <input type="color" value="${p.color}" disabled>
-          <input class="name" value="${p.name}" disabled>
+          <input class="name" value="${p.name}" data-player-id="${p.id}">
         </div>
         <div class="pool" data-player-id="${p.id}">
           <div class="token" draggable="true" style="background:${p.color}" data-player-id="${p.id}"></div>
-          <span>Táhni mě</span>
+          <span class="pool-label">Táhnout (${p.name})</span>
         </div>
       `;
       
+      // Naslouchání na změnu jména v políčku
+      const nameInput = pDiv.querySelector(".name");
+      nameInput.addEventListener("input", (e) => {
+        p.name = e.target.value;
+        pDiv.querySelector(".pool-label").textContent = "Táhnout (" + p.name + ")";
+        updateMatches(); // Přepočítá popisky shod s novým jménem
+      });
+
       const token = pDiv.querySelector(".token");
       token.addEventListener("dragstart", e => {
         state.dragging = { playerId: p.id, source: "pool" };
@@ -204,171 +214,157 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
           e.preventDefault();
           td.classList.add("over");
         });
-        
-        td.addEventListener("dragleave", () => {
-          td.classList.remove("over");
-        });
-        
-        td.addEventListener("drop", e => {
-          e.preventDefault();
-          td.classList.remove("over");
-          if (!state.dragging) return;
-          
-          const day = parseInt(td.dataset.day);
-          const hour = parseInt(td.dataset.hour);
-          const pId = state.dragging.playerId;
-          
-          const existuje = state.tokens.some(t => t.day === day && t.hour === hour && t.playerId === pId);
-          if (!existuje) {
-            state.tokens.push({ day, hour, playerId: pId });
-            renderTokens();
-            saveData();
-          }
-        });
-        
-        tr.appendChild(td);
-      }
-      body.appendChild(tr);
-    }
-  }
 
-  // Vykreslení žetonů do mřížky na základě stavu
-  function renderTokens() {
-    document.querySelectorAll("td.slot .tokens").forEach(el => el.innerHTML = "");
-    
-    state.tokens.forEach(t => {
-      const slot = document.querySelector(`td.slot[data-day="${t.day}"][data-hour="${t.hour}"] .tokens`);
-      if (slot) {
-        const p = state.players.find(pl => pl.id === t.playerId);
-        if (p) {
-          const tok = document.createElement("div");
-          tok.className = "token";
-          tok.style.background = p.color;
-          tok.setAttribute("draggable", "true");
-          
-          tok.addEventListener("dragstart", () => {
-            state.dragging = { playerId: t.playerId, day: t.day, hour: t.hour, source: "board" };
-          });
-          
-          slot.appendChild(tok);
-        }
-      }
-    });
-    updateMatches();
-  }
+       td.addEventListener("dragleave", () => {
+td.classList.remove("over");
+});
+td.addEventListener("drop", e => {
+e.preventDefault();
+td.classList.remove("over");
+if (!state.dragging) return;
+const day = parseInt(td.dataset.day);
+const hour = parseInt(td.dataset.hour);
+const pId = state.dragging.playerId;
+const existuje = state.tokens.some(t => t.day === day && t.hour === hour && t.playerId === pId);
+if (!existuje) {
+state.tokens.push({ day, hour, playerId: pId });
+renderTokens();
+saveData();
+}
+});
+tr.appendChild(td);
+}
+body.appendChild(tr);
+}
+}
+// Vykreslení žetonů do mřížky a správa barevného podbarvení buněk
+function renderTokens() {
+document.querySelectorAll("td.slot").forEach(td => {
+td.querySelector(".tokens").innerHTML = "";
+td.classList.remove("full-slot"); // Reset zeleného podbarvení
+});
+state.tokens.forEach(t => {
+const slotTd = document.querySelector(`td.slot[data-day="${t.day}"][data-hour="${t.hour}"]`);
 
-  // Výpočet a zobrazení společných průniků všech hráčů
-  function updateMatches() {
-    const matchesDiv = getEl("matches");
-    matchesDiv.innerHTML = "";
-    
-    const totalPlayers = state.players.length;
-    let found = false;
-    
-    for (let d = 0; d < 14; d++) {
-      for (let h = 0; h < 24; h++) {
-        const count = state.tokens.filter(t => t.day === d && t.hour === h).length;
-        if (count === totalPlayers) {
-          found = true;
-          const span = document.createElement("span");
-          span.className = "match";
-          span.textContent = dayLabel(d) + " ve " + String(h).padStart(2,"0") + ":00";
-          matchesDiv.appendChild(span);
-        }
-      }
-    }
-    if (!found) {
-      matchesDiv.innerHTML = '<span class="status">Zatím nejsou žádné společné sloty.</span>';
-    }
-  }
-
- // Funkce pro ukládání dat do Supabase (upraveno pro vaši tabulku)
-  async function saveData() {
-    if (!state.room) return;
-    status("Ukládám…", "ok");
-    
-    // Posíláme 'room_code' místo 'id' a data balíme do sloupce 'state'
-    const { error } = await sb.from("rooms").upsert({ 
-      room_code: state.room, 
-      state: { tokens: state.tokens },
-      updated_at: new Date()
-    });
-    
-    if (error) {
-      status("Chyba ukládání", "err");
-      console.error(error);
-    } else {
-      status("Připojeno", "ok");
-    }
-  }
-
-  // Funkce pro načtení dat ze Supabase při startu (upraveno pro vaši tabulku)
-  async function loadData() {
-    if (!state.room) return;
-    status("Načítám data…");
-    
-    // Hledáme podle 'room_code' a vytahujeme sloupec 'state'
-    const { data, error } = await sb.from("rooms").select("state").eq("room_code", state.room).maybeSingle();
-
-    if (error) {
-      status("Chyba načítání", "err");
-      console.error(error);
-    } else {
-      // Data rozbalíme ze sloupce 'state'
-      state.tokens = data && data.state && data.state.tokens ? data.state.tokens : [];
-      renderTokens();
-      status("Připojeno", "ok");
-    }
-  }
-
-  // Inicializace místnosti
-  function initRoom(code) {
-    state.room = code;
-    location.hash = "room=" + code;
-    getEl("roomCode").textContent = code;
-    getEl("setupOverlay").classList.add("hidden");
-    
-    renderPlayers();
-    buildBoard();
-    loadData();
-    
-    document.body.addEventListener("dragover", e => e.preventDefault());
-    document.body.addEventListener("drop", e => {
-      if (state.dragging && state.dragging.source === "board") {
-        state.tokens = state.tokens.filter(t => 
-          !(t.day === state.dragging.day && t.hour === state.dragging.hour && t.playerId === state.dragging.playerId)
-        );
-        state.dragging = null;
-        renderTokens();
-        saveData();
-      }
-    });
-  }
-
-  // Event Listenery pro UI prvky
-  getEl("copyLink").addEventListener("click", () => {
-    navigator.clipboard.writeText(location.href);
-    alert("Odkaz na místnost byl zkopírován!");
-  });
-
-  getEl("newRoom").addEventListener("click", () => {
-    initRoom(randomRoom());
-  });
-
-  getEl("createRoom").addEventListener("click", () => {
-    const val = getEl("roomInput").value.trim().toUpperCase();
-    if (val) initRoom(val);
-  });
-
-  // Start aplikace
-  const currentRoom = roomFromUrl();
-  if (currentRoom) {
-    initRoom(currentRoom);
-  } else {
-    getEl("setupOverlay").classList.remove("hidden");
-    status("Čekám na vytvoření místnosti…");
-  }
+if (slotTd) {
+const tokensContainer = slotTd.querySelector(".tokens");
+const p = state.players.find(pl => pl.id === t.playerId);
+if (p) {
+const tok = document.createElement("div");
+tok.className = "token";
+tok.style.background = p.color;
+tok.setAttribute("draggable", "true");
+tok.addEventListener("dragstart", () => {
+state.dragging = { playerId: t.playerId, day: t.day, hour: t.hour, source: "board" };
+});
+tokensContainer.appendChild(tok);
+}
+}
+});
+// Kontrola zaplnění: Pokud má buňka 5 koleček, podbarvíme ji zeleně
+document.querySelectorAll("td.slot").forEach(td => {
+const currentTokensCount = td.querySelector(".tokens").children.length;
+if (currentTokensCount === state.players.length) {
+td.classList.add("full-slot");
+}
+});
+updateMatches();
+}
+// Výpočet a zobrazení společných průniků všech hráčů
+function updateMatches() {
+const matchesDiv = getEl("matches");
+matchesDiv.innerHTML = "";
+const totalPlayers = state.players.length;
+let found = false;
+for (let d = 0; d < 14; d++) {
+for (let h = 0; h < 24; h++) {
+const count = state.tokens.filter(t => t.day === d && t.hour === h).length;
+if (count === totalPlayers) {
+found = true;
+const span = document.createElement("span");
+span.className = "match";
+span.textContent = dayLabel(d) + " ve " + String(h).padStart(2,"0") + ":00";
+matchesDiv.appendChild(span);
+}
+}
+}
+if (!found) {
+matchesDiv.innerHTML = 'Zatím nejsou žádné společné sloty.';
+}
+}
+// Funkce pro ukládání dat do Supabase
+async function saveData() {
+if (!state.room) return;
+status("Ukládám…", "ok");
+const { error } = await sb.from("rooms").upsert({
+room_code: state.room,
+state: { tokens: state.tokens },
+updated_at: new Date()
+});
+if (error) {
+status("Chyba ukládání", "err");
+console.error(error);
+} else {
+status("Připojeno", "ok");
+}
+}
+// Funkce pro načtení dat ze Supabase při startu
+async function loadData() {
+if (!state.room) return;
+status("Načítám data…");
+const { data, error } = await sb.from("rooms").select("state").eq("room_code", state.room).maybeSingle();
+if (error) {
+status("Chyba načítání", "err");
+console.error(error);
+} else {
+state.tokens = data && data.state && data.state.tokens ? data.state.tokens : [];
+renderTokens();
+status("Připojeno", "ok");
+}
+}
+// Inicializace místnosti
+function initRoom(code) {
+state.room = code;
+location.hash = "room=" + code;
+getEl("roomCode").textContent = code;
+getEl("setupOverlay").classList.add("hidden");
+renderPlayers();
+buildBoard();
+loadData();
+document.body.addEventListener("dragover", e => e.preventDefault());
+document.body.addEventListener("drop", e => {
+if (state.dragging && state.dragging.source === "board") {
+state.tokens = state.tokens.filter(t =>
+!(t.day === state.dragging.day && t.hour === state.dragging.hour && t.playerId === state.dragging.playerId)
+);
+state.dragging = null;
+renderTokens();
+saveData();
+}
+});
+}
+// Event Listenery pro UI prvky
+getEl("copyLink").addEventListener("click", () => {
+navigator.clipboard.writeText(location.href);
+alert("Odkaz na místnost byl zkopírován!");
+});
+getEl("newRoom").addEventListener("click", () => {
+initRoom(randomRoom());
+});
+getEl("createRoom").addEventListener("click", () => {
+const val = getEl("roomInput").value.trim().toUpperCase();
+if (val) initRoom(val);
+});
+// Start aplikace
+const currentRoom = roomFromUrl();
+if (currentRoom) {
+initRoom(currentRoom);
+} else {
+getEl("setupOverlay").classList.remove("hidden");
+status("Čekám na vytvoření místnosti…");
+}
 })();
+
 </script>
 
 
