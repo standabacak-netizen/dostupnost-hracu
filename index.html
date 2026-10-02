@@ -90,9 +90,10 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
 (() => {
-  // Klíče jsou v ostré verzi nasazené, zde ponecháno pro inicializaci
+  // Zde doplňte své ostré klíče ze Supabase
   const SUPABASE_URL = "https://eogswjjxeqxomimevqmq.supabase.co/rest/v1/";
   const SUPABASE_KEY = "sb_publishable_cRwExBvhx9itYp-9158eHA_Lh_SIxMf";
 
@@ -113,20 +114,31 @@
     applyingRemote: false
   };
 
-  const \$ = id => document.getElementById(id);
-  const status = (msg, cls="") => { ("status").textContent=msg; ("status").className="status "+cls; };
+  // Kompletně přepsáno bez znaku dolaru, aby systém nevkládal lomítka
+  function getEl(id) {
+    return document.getElementById(id);
+  }
+
+  function status(msg, cls="") { 
+    getEl("status").textContent = msg; 
+    getEl("status").className = "status " + cls; 
+  }
 
   function roomFromUrl(){
     const m = location.hash.match(/^#room=([A-Za-z0-9_-]+)\$/);
     return m ? m[1].toUpperCase() : null;
   }
+  
   function randomRoom(){
     const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let s="";
     for(let i=0;i<6;i++) s+=chars[Math.floor(Math.random()*chars.length)];
     return s;
   }
-  function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c]));}
+  
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c]));
+  }
 
   function dateAt(offset){
     const d=new Date();
@@ -134,15 +146,16 @@
     d.setDate(d.getDate()+offset);
     return d;
   }
+  
   function dayLabel(offset){
     const d=dateAt(offset);
     const wd=["Ne","Po","Út","St","Čt","Pá","So"][d.getDay()];
-    return `${wd} ${d.getDate()}.${d.getMonth()+1}.`;
+    return wd + " " + d.getDate() + "." + (d.getMonth()+1) + ".";
   }
 
   // Vykreslení seznamu hráčů (hromádky pro přetahování)
   function renderPlayers() {
-    const container = \$("players");
+    const container = getEl("players");
     container.innerHTML = "";
     state.players.forEach(p => {
       const pDiv = document.createElement("div");
@@ -158,7 +171,6 @@
         </div>
       `;
       
-      // Aktivace táhnutí z hromádky
       const token = pDiv.querySelector(".token");
       token.addEventListener("dragstart", e => {
         state.dragging = { playerId: p.id, source: "pool" };
@@ -169,9 +181,10 @@
 
   // Kompletní sestavení kalendáře a obsluha přetažení (Drag & Drop)
   function buildBoard(){
-    const head=("board").querySelector("thead tr"), body=("board").querySelector("tbody");
-    head.innerHTML='<th class="day-head">Den</th>';
-    body.innerHTML="";
+    const head = getEl("board").querySelector("thead tr");
+    const body = getEl("board").querySelector("tbody");
+    head.innerHTML = '<th class="day-head">Den</th>';
+    body.innerHTML = "";
     
     for(let h=0;h<24;h++){
       const th=document.createElement("th"); th.textContent=String(h).padStart(2,"0")+":00"; head.appendChild(th);
@@ -203,7 +216,6 @@
           const hour = parseInt(td.dataset.hour);
           const pId = state.dragging.playerId;
           
-          // Kontrola, zda už hráč v této hodině není
           const existuje = state.tokens.some(t => t.day === day && t.hour === hour && t.playerId === pId);
           if (!existuje) {
             state.tokens.push({ day, hour, playerId: pId });
@@ -220,7 +232,6 @@
 
   // Vykreslení žetonů do mřížky na základě stavu
   function renderTokens() {
-    // Vyčistíme všechny buňky
     document.querySelectorAll("td.slot .tokens").forEach(el => el.innerHTML = "");
     
     state.tokens.forEach(t => {
@@ -246,7 +257,7 @@
 
   // Výpočet a zobrazení společných průniků všech hráčů
   function updateMatches() {
-    const matchesDiv = \$("matches");
+    const matchesDiv = getEl("matches");
     matchesDiv.innerHTML = "";
     
     const totalPlayers = state.players.length;
@@ -259,7 +270,7 @@
           found = true;
           const span = document.createElement("span");
           span.className = "match";
-          span.textContent = `${dayLabel(d)} ve ${String(h).padStart(2,"0")}:00`;
+          span.textContent = dayLabel(d) + " ve " + String(h).padStart(2,"0") + ":00";
           matchesDiv.appendChild(span);
         }
       }
@@ -308,16 +319,14 @@
   // Inicializace místnosti
   function initRoom(code) {
     state.room = code;
-    location.hash = `room=${code}`;
-    \$("roomCode").textContent = code;
-    \$("setupOverlay").classList.add("hidden");
+    location.hash = "room=" + code;
+    getEl("roomCode").textContent = code;
+    getEl("setupOverlay").classList.add("hidden");
     
-    // Načteme data a vykreslíme rozhraní
     renderPlayers();
     buildBoard();
     loadData();
     
-    // Aktivace mazání přetažením mimo tabulku
     document.body.addEventListener("dragover", e => e.preventDefault());
     document.body.addEventListener("drop", e => {
       if (state.dragging && state.dragging.source === "board") {
@@ -332,17 +341,17 @@
   }
 
   // Event Listenery pro UI prvky
-  \$("copyLink").addEventListener("click", () => {
+  getEl("copyLink").addEventListener("click", () => {
     navigator.clipboard.writeText(location.href);
     alert("Odkaz na místnost byl zkopírován!");
   });
 
-  \$("newRoom").addEventListener("click", () => {
+  getEl("newRoom").addEventListener("click", () => {
     initRoom(randomRoom());
   });
 
-  \$("createRoom").addEventListener("click", () => {
-    const val = \$("roomInput").value.trim().toUpperCase();
+  getEl("createRoom").addEventListener("click", () => {
+    const val = getEl("roomInput").value.trim().toUpperCase();
     if (val) initRoom(val);
   });
 
@@ -351,10 +360,13 @@
   if (currentRoom) {
     initRoom(currentRoom);
   } else {
-    \$("setupOverlay").classList.remove("hidden");
+    getEl("setupOverlay").classList.remove("hidden");
     status("Čekám na vytvoření místnosti…");
   }
 })();
+</script>
+
+
 
 
 </script>
