@@ -153,8 +153,8 @@
     return d;
   }
   
-  function dayLabel(offset){
-    const d=dateAt(offset);
+  function dayLabel(dayInput){
+    const d = typeof dayInput === "string" ? new Date(dayInput) : dateAt(dayInput);
     const wd=["Ne","Po","Út","St","Čt","Pá","So"][d.getDay()];
     return wd + " " + d.getDate() + "." + (d.getMonth()+1) + ".";
   }
@@ -193,8 +193,15 @@
       container.appendChild(pDiv);
     });
   }
+   // Nová pomocná funkce pro formátování na YYYY-MM-DD
+  function formatDate(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
 
-  function buildBoard(){
+    function buildBoard(){
     const head = getEl("board").querySelector("thead tr");
     const body = getEl("board").querySelector("tbody");
     head.innerHTML = '<th class="day-head">Den</th>';
@@ -205,11 +212,15 @@
     }
     
     for(let d=0;d<14;d++){
+      const currentColumnDate = dateAt(d); // Získáme reálné datum pro tento řádek
+      const dateStr = formatDate(currentColumnDate); // "YYYY-MM-DD"
+      
       const tr=document.createElement("tr");
-      const th=document.createElement("th"); th.className="day-cell"; th.textContent=dayLabel(d); tr.appendChild(th);
+      const th=document.createElement("th"); th.className="day-cell"; th.textContent=dayLabel(currentColumnDate); tr.appendChild(th);
       
       for(let h=0;h<24;h++){
-        const td=document.createElement("td"); td.className="slot"; td.dataset.day=d; td.dataset.hour=h;
+        // ZDE ZMĚNA: ukládáme dateStr namísto indexu d
+        const td=document.createElement("td"); td.className="slot"; td.dataset.day=dateStr; td.dataset.hour=h;
         td.innerHTML='<div class="tokens"></div>';
         
         td.addEventListener("dragover", e => {
@@ -226,7 +237,7 @@
           td.classList.remove("over");
           if (!state.dragging) return;
           
-          const day = parseInt(td.dataset.day);
+          const day = td.dataset.day; // Nyní je to řetězec "YYYY-MM-DD"
           const hour = parseInt(td.dataset.hour);
           const pId = state.dragging.playerId;
           
@@ -243,6 +254,7 @@
       body.appendChild(tr);
     }
   }
+
 
   function renderTokens() {
     document.querySelectorAll("td.slot").forEach(td => {
