@@ -146,15 +146,31 @@
     return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c]));
   }
 
+  // Pomocná funkce pro bezpečné vytvoření lokálního data bez posunu časových pásem
   function dateAt(offset){
     const d=new Date();
-    d.setHours(12,0,0,0);
     d.setDate(d.getDate()+offset);
     return d;
   }
   
+  // Bezpečné formátování na YYYY-MM-DD z objektu Date
+  function formatDate(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  
+  // Univerzální a bezpečná funkce pro zobrazení popisku dne
   function dayLabel(dayInput){
-    const d = typeof dayInput === "string" ? new Date(dayInput) : dateAt(dayInput);
+    let d;
+    if (typeof dayInput === "string") {
+      // Bezpečné naparsování YYYY-MM-DD splitnutím, aby nedošlo k UTC posunu
+      const parts = dayInput.split('-');
+      d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+    } else {
+      d = dayInput;
+    }
     const wd=["Ne","Po","Út","St","Čt","Pá","So"][d.getDay()];
     return wd + " " + d.getDate() + "." + (d.getMonth()+1) + ".";
   }
@@ -181,7 +197,6 @@
         pDiv.querySelector(".pool-label").textContent = "Táhnout (" + p.name + ")";
         updateMatches();
         
-        // Automatické ukládání jména s malým zpožděním, aby se DB nepřetížila při každém písmenku
         clearTimeout(state.saveTimer);
         state.saveTimer = setTimeout(saveData, 500);
       });
@@ -193,15 +208,8 @@
       container.appendChild(pDiv);
     });
   }
-   // Nová pomocná funkce pro formátování na YYYY-MM-DD
-  function formatDate(d) {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
 
-    function buildBoard(){
+  function buildBoard(){
     const head = getEl("board").querySelector("thead tr");
     const body = getEl("board").querySelector("tbody");
     head.innerHTML = '<th class="day-head">Den</th>';
@@ -212,14 +220,13 @@
     }
     
     for(let d=0;d<14;d++){
-      const currentColumnDate = dateAt(d); // Získáme reálné datum pro tento řádek
-      const dateStr = formatDate(currentColumnDate); // "YYYY-MM-DD"
+      const currentColumnDate = dateAt(d);
+      const dateStr = formatDate(currentColumnDate);
       
       const tr=document.createElement("tr");
       const th=document.createElement("th"); th.className="day-cell"; th.textContent=dayLabel(currentColumnDate); tr.appendChild(th);
       
       for(let h=0;h<24;h++){
-        // ZDE ZMĚNA: ukládáme dateStr namísto indexu d
         const td=document.createElement("td"); td.className="slot"; td.dataset.day=dateStr; td.dataset.hour=h;
         td.innerHTML='<div class="tokens"></div>';
         
@@ -237,7 +244,7 @@
           td.classList.remove("over");
           if (!state.dragging) return;
           
-          const day = td.dataset.day; // Nyní je to řetězec "YYYY-MM-DD"
+          const day = td.dataset.day;
           const hour = parseInt(td.dataset.hour);
           const pId = state.dragging.playerId;
           
@@ -255,15 +262,13 @@
     }
   }
 
-
-    function renderTokens() {
+  function renderTokens() {
     document.querySelectorAll("td.slot").forEach(td => {
       td.querySelector(".tokens").innerHTML = "";
       td.classList.remove("full-slot");
     });
     
     state.tokens.forEach(t => {
-      // ZDE ZMĚNA: u t.day odebrán parseInt, hledáme přímo shodu řetězců
       const slotTd = document.querySelector("td.slot[data-day='" + t.day + "'][data-hour='" + t.hour + "']");
       if (slotTd) {
         const tokensContainer = slotTd.querySelector(".tokens");
@@ -293,27 +298,24 @@
     updateMatches();
   }
 
-
-    function updateMatches() {
+  function updateMatches() {
     const matchesDiv = getEl("matches");
     matchesDiv.innerHTML = "";
     
     const totalPlayers = state.players.length;
     let found = false;
     
-    // ZDE ZMĚNA: Procházíme reálných 14 budoucích dní a generujeme jejich YYYY-MM-DD klíče
     for (let d = 0; d < 14; d++) {
       const currentColumnDate = dateAt(d);
       const dateStr = formatDate(currentColumnDate);
 
       for (let h = 0; h < 24; h++) {
-        // Hledáme shodu podle textového data dateStr
         const count = state.tokens.filter(t => t.day === dateStr && t.hour === h).length;
         if (count === totalPlayers) {
           found = true;
           const span = document.createElement("span");
           span.className = "match";
-          span.textContent = dayLabel(currentColumnDate) + " ve " + String(h).padStart(2,"0") + ":00";
+          span.textContent = dayLabel(dateStr) + " ve " + String(h).padStart(2,"0") + ":00";
           matchesDiv.appendChild(span);
         }
       }
@@ -323,12 +325,10 @@
     }
   }
 
-
   async function saveData() {
     if (!state.room) return;
     status("Ukládám…", "ok");
     
-    // Do sloupce 'state' teď balíme jak puntíky (tokens), tak i jména hráčů (players)
     const { error } = await sb.from("rooms").upsert({ 
       room_code: state.room, 
       state: { 
@@ -356,10 +356,9 @@
       status("Chyba načítání", "err");
       console.error(error);
     } else {
-      // Pokud v DB jména jsou, načteme je, jinak necháme výchozí
       if (data && data.state && data.state.players) {
         state.players = data.state.players;
-        renderPlayers(); // Překreslíme seznam s načtenými jmény
+        renderPlayers();
       }
       
       state.tokens = data && data.state && data.state.tokens ? data.state.tokens : [];
