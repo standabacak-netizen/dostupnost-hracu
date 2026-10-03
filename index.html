@@ -256,13 +256,14 @@
   }
 
 
-  function renderTokens() {
+    function renderTokens() {
     document.querySelectorAll("td.slot").forEach(td => {
       td.querySelector(".tokens").innerHTML = "";
       td.classList.remove("full-slot");
     });
     
     state.tokens.forEach(t => {
+      // ZDE ZMĚNA: u t.day odebrán parseInt, hledáme přímo shodu řetězců
       const slotTd = document.querySelector("td.slot[data-day='" + t.day + "'][data-hour='" + t.hour + "']");
       if (slotTd) {
         const tokensContainer = slotTd.querySelector(".tokens");
@@ -292,21 +293,27 @@
     updateMatches();
   }
 
-  function updateMatches() {
+
+    function updateMatches() {
     const matchesDiv = getEl("matches");
     matchesDiv.innerHTML = "";
     
     const totalPlayers = state.players.length;
     let found = false;
     
+    // ZDE ZMĚNA: Procházíme reálných 14 budoucích dní a generujeme jejich YYYY-MM-DD klíče
     for (let d = 0; d < 14; d++) {
+      const currentColumnDate = dateAt(d);
+      const dateStr = formatDate(currentColumnDate);
+
       for (let h = 0; h < 24; h++) {
-        const count = state.tokens.filter(t => t.day === d && t.hour === h).length;
+        // Hledáme shodu podle textového data dateStr
+        const count = state.tokens.filter(t => t.day === dateStr && t.hour === h).length;
         if (count === totalPlayers) {
           found = true;
           const span = document.createElement("span");
           span.className = "match";
-          span.textContent = dayLabel(d) + " ve " + String(h).padStart(2,"0") + ":00";
+          span.textContent = dayLabel(currentColumnDate) + " ve " + String(h).padStart(2,"0") + ":00";
           matchesDiv.appendChild(span);
         }
       }
@@ -315,6 +322,7 @@
       matchesDiv.innerHTML = '<span class="status">Zatím nejsou žádné společné sloty.</span>';
     }
   }
+
 
   async function saveData() {
     if (!state.room) return;
