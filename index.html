@@ -102,7 +102,7 @@
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     db: { schema: 'public' }
   });
-  const state = {
+    const state = {
     room: null,
     players: [
       {id:0,name:"Hráč 1",color:"#e45757"},
@@ -138,7 +138,7 @@
   function randomRoom(){
     const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let s="";
-    for(let i=0;i<6;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+    for(let i=0;i<6;i++) s+=chars[chars.length * Math.random() | 0];
     return s;
   }
   
@@ -146,14 +146,15 @@
     return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c]));
   }
 
-  // Pomocná funkce pro bezpečné vytvoření lokálního data bez posunu časových pásem
+  // OPRAVENO: Vráceno bezpečné ukotvení času na poledne, aby se dny nepřesouvaly špatně
   function dateAt(offset){
     const d=new Date();
+    d.setHours(12,0,0,0);
     d.setDate(d.getDate()+offset);
     return d;
   }
   
-  // Bezpečné formátování na YYYY-MM-DD z objektu Date
+  // Bezpečné formátování na textový řetězec YYYY-MM-DD
   function formatDate(d) {
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -161,11 +162,10 @@
     return `${year}-${month}-${day}`;
   }
   
-  // Univerzální a bezpečná funkce pro zobrazení popisku dne
+  // OPRAVENO: Plně funkční formátování popisků sloupců i pro textové vstupy z DB
   function dayLabel(dayInput){
     let d;
     if (typeof dayInput === "string") {
-      // Bezpečné naparsování YYYY-MM-DD splitnutím, aby nedošlo k UTC posunu
       const parts = dayInput.split('-');
       d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
     } else {
