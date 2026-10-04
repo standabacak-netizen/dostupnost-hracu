@@ -52,6 +52,22 @@
     .modal input{width:100%;padding:11px;border:1px solid var(--border);border-radius:8px;font-size:16px;margin:8px 0}
     .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
     .hidden{display:none!important}
+    /* Zvýraznění dnešního řádku */
+tr.today-row td.slot {
+  border-top: 2px solid var(--accent) !important;
+  border-bottom: 2px solid var(--accent) !important;
+}
+tr.today-row td.slot:first-of-type {
+  border-left: 2px solid var(--accent) !important;
+}
+tr.today-row td.slot:last-of-type {
+  border-right: 2px solid var(--accent) !important;
+}
+tr.today-row th.day-cell {
+  border: 2px solid var(--accent) !important;
+  background: var(--accent-bg) !important;
+  color: var(--accent) !important;
+}
     @media(max-width:900px){.players{grid-template-columns:repeat(2,minmax(150px,1fr))}}
   </style>
 </head>
@@ -146,13 +162,13 @@
     return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"'"}[c]));
   }
 
-  // OPRAVENO: Vráceno bezpečné ukotvení času na poledne, aby se dny nepřesouvaly špatně
-  function dateAt(offset){
-    const d=new Date();
-    d.setHours(12,0,0,0);
-    d.setDate(d.getDate()+offset);
-    return d;
-  }
+ // UPRAVENO: Tabulka začíná napevno dnes (4. 10. 2026) a nebude se po půlnoci posouvat
+function dateAt(offset){
+  // 4. října 2026, 12:00:00
+  const d = new Date(2026, 9, 4, 12, 0, 0, 0); 
+  d.setDate(d.getDate() + offset);
+  return d;
+}
   
   // Bezpečné formátování na textový řetězec YYYY-MM-DD
   function formatDate(d) {
@@ -219,13 +235,19 @@
       const th=document.createElement("th"); th.textContent=String(h).padStart(2,"0")+":00"; head.appendChild(th);
     }
     
-    for(let d=0;d<14;d++){
-      const currentColumnDate = dateAt(d);
-      const dateStr = formatDate(currentColumnDate);
-      
-      const tr=document.createElement("tr");
-      const th=document.createElement("th"); th.className="day-cell"; th.textContent=dayLabel(currentColumnDate); tr.appendChild(th);
-      
+for(let d=0;d<15;d++){
+  const currentColumnDate = dateAt(d);
+  const dateStr = formatDate(currentColumnDate);
+  
+  const tr=document.createElement("tr");
+  
+  // NOVÉ: Kontrola, zda je tento řádek "dnes"
+  const dneska = new Date();
+  if (formatDate(dneska) === dateStr) {
+    tr.className = "today-row";
+  }
+  
+  const th=document.createElement("th"); th.className="day-cell"; th.textContent
       for(let h=0;h<24;h++){
         const td=document.createElement("td"); td.className="slot"; td.dataset.day=dateStr; td.dataset.hour=h;
         td.innerHTML='<div class="tokens"></div>';
@@ -298,32 +320,44 @@
     updateMatches();
   }
 
-  function updateMatches() {
-    const matchesDiv = getEl("matches");
-    matchesDiv.innerHTML = "";
-    
-    const totalPlayers = state.players.length;
-    let found = false;
-    
-    for (let d = 0; d < 14; d++) {
-      const currentColumnDate = dateAt(d);
-      const dateStr = formatDate(currentColumnDate);
+ function updateMatches() {
+  const matchesDiv = getEl("matches");
+  matchesDiv.innerHTML = "";
+  
+  const totalPlayers = state.players.length;
+  let found = false;
+  const nyni = new Date(); // NOVÉ: Aktuální reálný čas pro porovnání
+  
+  for (let d = 0; d < 15; d++) {
+    const currentColumnDate = dateAt(d);
+    const dateStr = formatDate(currentColumnDate);
 
-      for (let h = 0; h < 24; h++) {
-        const count = state.tokens.filter(t => t.day === dateStr && t.hour === h).length;
-        if (count === totalPlayers) {
-          found = true;
-          const span = document.createElement("span");
-          span.className = "match";
-          span.textContent = dayLabel(dateStr) + " ve " + String(h).padStart(2,"0") + ":00";
-          matchesDiv.appendChild(span);
+    for (let h = 0; h < 24; h++) {
+      const count = state.tokens.filter(t => t.day === dateStr && t.hour === h).length;
+      if (count === totalPlayers) {
+        
+        // NOVÉ: Sestavíme přesný čas slotu (nastavíme mu hodinu z cyklu)
+        const slotTime = new Date(currentColumnDate);
+        slotTime.setHours(h, 0, 0, 0);
+        
+        // Pokud je čas slotu menší než aktuální reálný čas, přeskočíme ho (nezapíšeme)
+        if (slotTime < nyni) {
+          continue;
         }
+
+        found = true;
+        const span = document.createElement("span");
+        span.className = "match";
+        span.textContent = dayLabel(dateStr) + " ve " + String(h).padStart(2,"0") + ":00";
+        matchesDiv.appendChild(span);
       }
     }
-    if (!found) {
-      matchesDiv.innerHTML = '<span class="status">Zatím nejsou žádné společné sloty.</span>';
-    }
   }
+  if (!found) {
+    matchesDiv.innerHTML = '<span class="status">Zatím nejsou žádné společné sloty.</span>';
+  }
+}
+
 
   async function saveData() {
     if (!state.room) return;
