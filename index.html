@@ -247,7 +247,8 @@ for(let d=0;d<15;d++){
     tr.className = "today-row";
   }
   
-  const th=document.createElement("th"); th.className="day-cell"; th.textContent
+// OPRAVENO: Správně dokončený řádek pro vložení textu dne do buňky
+const th=document.createElement("th"); th.className="day-cell"; th.textContent=dayLabel(currentColumnDate); tr.appendChild(th);
       for(let h=0;h<24;h++){
         const td=document.createElement("td"); td.className="slot"; td.dataset.day=dateStr; td.dataset.hour=h;
         td.innerHTML='<div class="tokens"></div>';
